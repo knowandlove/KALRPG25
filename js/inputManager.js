@@ -4,7 +4,7 @@ import CONFIG from './config.js';
 export default class InputManager {
     constructor(canvas) {
         this.canvas = canvas; // Needed for mouse coordinate calculations relative to canvas
-
+        this.isTyping = false; // Add this line
         this.keys = {}; // Stores the state of currently pressed keys
         this.mouse = {
             x: 0,
@@ -32,10 +32,17 @@ export default class InputManager {
     _setupEventListeners() {
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
+            
+            // If we're typing, let the keypress through to the input field
+            if (this.isTyping) {
+                // Don't update game keys while typing
+                return;
+            }
+            
             this.keys[key] = true;
             this._updateActiveActions();
             
-            // Prevent default browser action for keys we use (e.g., spacebar scrolling)
+            // Prevent default browser action for keys we use ONLY if not typing
             for (const action in this.actionMap) {
                 if (this.actionMap[action].includes(key) && this.gameMode === 'adventure') {
                     e.preventDefault();
@@ -53,13 +60,11 @@ export default class InputManager {
             this.mouse.isDown = true;
             this.mouse.clicked = true; // Will be true for one update cycle
             this._updateMousePosition(e);
-            // console.log(`Mouse down at (${this.mouse.x}, ${this.mouse.y})`);
         });
 
         this.canvas.addEventListener('mouseup', (e) => {
             this.mouse.isDown = false;
             this._updateMousePosition(e);
-            // console.log(`Mouse up at (${this.mouse.x}, ${this.mouse.y})`);
         });
 
         this.canvas.addEventListener('mousemove', (e) => {

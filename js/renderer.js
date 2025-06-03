@@ -301,8 +301,6 @@ export default class Renderer {
 
         // DEBUG: Log available layers
         const availableLayers = Object.keys(currentScreen.layers);
-        console.log(`🗺️ Available layers in ${worldEngine.currentScreen}:`, availableLayers);
-
         const startXTile = Math.floor(this.camera.x / CONFIG.TILE_SIZE);
         const endXTile = Math.min(startXTile + Math.ceil(this.camera.width / (CONFIG.TILE_SIZE * this.camera.zoom)) + 1, worldEngine.screenWidth);
         const startYTile = Math.floor(this.camera.y / CONFIG.TILE_SIZE);
@@ -316,7 +314,6 @@ export default class Renderer {
         layerOrder.forEach(layerName => {
             const layer = currentScreen.layers[layerName];
             if (layer && layer.visible !== false && layer.data) {
-                console.log(`🎨 Rendering layer: ${layerName}`);
                 this.drawScreenLayer(layer, worldEngine, startXTile, endXTile, startYTile, endYTile);
             }
         });
@@ -325,7 +322,6 @@ export default class Renderer {
         // This will help us see what layers actually exist
         Object.entries(currentScreen.layers).forEach(([layerName, layer]) => {
             if (layer && layer.data && !layerOrder.includes(layerName)) {
-                console.log(`🎨 Rendering unknown layer: ${layerName}`);
                 this.drawScreenLayer(layer, worldEngine, startXTile, endXTile, startYTile, endYTile);
             }
         });

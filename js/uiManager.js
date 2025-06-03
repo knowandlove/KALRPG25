@@ -72,16 +72,64 @@ export default class UIManager {
         }
     }
 
-    updateEventLog(events) { // events is an array of event objects {text, time, timestamp}
-        if (!this.eventsEl || !events) return;
-        this.eventsEl.innerHTML = ''; // Clear existing log
+          updateEventLog(events) {
+        if (!this.eventsEl) {
+            console.warn('Events element not found!');
+            return;
+        }
+        
+        if (!events || !Array.isArray(events)) {
+            console.warn('Invalid events data:', events);
+            return;
+        }
+        
+        // Don't update if nothing has changed (prevent flicker)
+        const eventSignature = events.map(e => e.timestamp).join(',');
+        if (this.lastEventSignature === eventSignature) {
+            return; // No changes, don't re-render
+        }
+        this.lastEventSignature = eventSignature;
+        
+        // Clear and rebuild
+        this.eventsEl.innerHTML = '';
+        
+        if (events.length === 0) {
+            const noEvents = document.createElement('div');
+            noEvents.className = 'event-entry';
+            noEvents.style.color = '#666';
+            noEvents.textContent = 'No events yet...';
+            this.eventsEl.appendChild(noEvents);
+            return;
+        }
 
         // Display up to a certain number of recent events
         const maxEventsToShow = 10;
-        for (const event of events.slice(0, maxEventsToShow)) {
+        for (let i = 0; i < Math.min(events.length, maxEventsToShow); i++) {
+            const event = events[i];
             const entry = document.createElement('div');
-            entry.className = 'event-entry'; // Class from original CSS
-            entry.textContent = event.text;
+            entry.className = 'event-entry';
+            
+            // Ensure text is visible with inline styles
+            entry.style.cssText = `
+                color: #fff;
+                padding: 5px;
+                margin: 2px 0;
+                background: #222;
+                border-left: 3px solid #66f;
+                font-size: 12px;
+                font-family: 'Courier New', monospace;
+                animation: none;
+            `;
+            
+            // Handle both string events and event objects
+            if (typeof event === 'string') {
+                entry.textContent = event;
+            } else if (event && event.text) {
+                entry.textContent = event.text;
+            } else {
+                entry.textContent = 'Unknown event';
+            }
+            
             this.eventsEl.appendChild(entry);
         }
     }
