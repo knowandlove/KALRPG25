@@ -1,9 +1,10 @@
 // player.js
 import CONFIG from './config.js';
-// We might need to import a utility for collision detection from worldEngine or a utils.js later
+import { Physics } from './physics.js';
+import { SpriteAnimator } from './spriteSystem.js';
 
 export default class Player {
-    constructor(initialX, initialY) {
+    constructor(initialX, initialY, spriteSystem = null) {
         // Core Position and Appearance
         this.x = initialX;
         this.y = initialY;
@@ -11,6 +12,11 @@ export default class Player {
         this.height = CONFIG.TILE_SIZE * 0.75;
         this.speed = CONFIG.PLAYER_SPEED; // From config.js
         this.facing = 'down'; // 'up', 'down', 'left', 'right'
+        
+        // Sprite animation
+        this.spriteAnimator = spriteSystem ? 
+            new SpriteAnimator('player_male_1', spriteSystem) : null;
+        this.isMoving = false;
 
         // Stats - from kalrpgsinglev1.html Player object
         this.hp = CONFIG.PLAYER_HP;
@@ -47,40 +53,27 @@ export default class Player {
             duration: 200, // Milliseconds
             friction: 0.88
         };
-
-        // TODO: Inventory system can be added later
-        // this.inventory = [];
     }
 
     update(deltaTime, inputActions, worldEngine) {
-        const deltaSeconds = deltaTime / 1000; // Convert ms to seconds for speed calculations
-
         // Handle knockback first
         if (this.knockback.active) {
             this.knockback.timer += deltaTime;
             
-            let newX = this.x + this.knockback.vx * deltaSeconds * 60; // Apply knockback (60fps assumption for force)
-            let newY = this.y + this.knockback.vy * deltaSeconds * 60;
-
-            // Collision checking during knockback
-            if (!worldEngine.isSolidTile(newX + this.width / 2, this.y + this.height / 2) && // Check center
-                !worldEngine.isSolidTile(newX, this.y) &&
-                !worldEngine.isSolidTile(newX + this.width, this.y) &&
-                !worldEngine.isSolidTile(newX, this.y + this.height) &&
-                !worldEngine.isSolidTile(newX + this.width, this.y + this.height)
-            ) {
-                this.x = newX - (newX % 1); // Prevent sub-pixel issues by flooring
-                this.y = newY - (newY % 1);
-            } else {
-                this.knockback.vx = 0; // Stop knockback on collision
-                this.knockback.vy = 0;
-            }
+            // Apply knockback using physics utility
+            const newVelocity = Physics.applyKnockback(
+                this, 
+                this.knockback.vx, 
+                this.knockback.vy, 
+                deltaTime, 
+                worldEngine
+            );
             
-            this.knockback.vx *= this.knockback.friction;
-            this.knockback.vy *= this.knockback.friction;
+            this.knockback.vx = newVelocity.vx * this.knockback.friction;
+            this.knockback.vy = newVelocity.vy * this.knockback.friction;
             
             if (Math.abs(this.knockback.vx) < 0.1 && Math.abs(this.knockback.vy) < 0.1) {
-                 this.knockback.active = false;
+                this.knockback.active = false;
             }
             if (this.knockback.timer >= this.knockback.duration) {
                 this.knockback.active = false;
@@ -89,52 +82,39 @@ export default class Player {
             // Normal movement based on inputActions (only if not in knockback)
             let moveX = 0;
             let moveY = 0;
+            this.isMoving = false;
 
             if (inputActions.up) {
-                moveY -= this.speed;
+                moveY = -1;
                 this.facing = 'up';
+                this.isMoving = true;
             }
             if (inputActions.down) {
-                moveY += this.speed;
+                moveY = 1;
                 this.facing = 'down';
+                this.isMoving = true;
             }
             if (inputActions.left) {
-                moveX -= this.speed;
+                moveX = -1;
                 this.facing = 'left';
+                this.isMoving = true;
             }
             if (inputActions.right) {
-                moveX += this.speed;
+                moveX = 1;
                 this.facing = 'right';
+                this.isMoving = true;
             }
 
-            // Normalize diagonal movement (optional, but good practice)
+            // Normalize diagonal movement
             if (moveX !== 0 && moveY !== 0) {
                 const length = Math.sqrt(moveX * moveX + moveY * moveY);
-                moveX = (moveX / length) * this.speed;
-                moveY = (moveY / length) * this.speed;
+                moveX = moveX / length;
+                moveY = moveY / length;
             }
             
-            const targetX = this.x + moveX * deltaSeconds * 60; // 60fps reference for speed
-            const targetY = this.y + moveY * deltaSeconds * 60;
-
-            // Basic collision detection (can be improved)
-            // Check X movement
-            if (!worldEngine.isSolidTile(targetX + this.width / 2, this.y + this.height / 2) &&
-                !worldEngine.isSolidTile(targetX, this.y) &&
-                !worldEngine.isSolidTile(targetX + this.width, this.y) &&
-                !worldEngine.isSolidTile(targetX, this.y + this.height) &&
-                !worldEngine.isSolidTile(targetX + this.width, this.y + this.height)
-            ) {
-                this.x = targetX;
-            }
-            // Check Y movement
-             if (!worldEngine.isSolidTile(this.x + this.width / 2, targetY + this.height / 2) &&
-                !worldEngine.isSolidTile(this.x, targetY) &&
-                !worldEngine.isSolidTile(this.x + this.width, targetY) &&
-                !worldEngine.isSolidTile(this.x, targetY + this.height) &&
-                !worldEngine.isSolidTile(this.x + this.width, targetY + this.height)
-            ) {
-                this.y = targetY;
+            // Use physics utility for movement
+            if (moveX !== 0 || moveY !== 0) {
+                Physics.moveEntity(this, moveX, moveY, deltaTime, worldEngine);
             }
         }
 
@@ -165,12 +145,12 @@ export default class Player {
             }
         }
 
-        // Keep player within world bounds (assuming worldEngine has these properties)
-        if (worldEngine.mapData && worldEngine.mapData.length > 0) {
-            const worldPixelWidth = worldEngine.worldWidthTiles * CONFIG.TILE_SIZE;
-            const worldPixelHeight = worldEngine.worldHeightTiles * CONFIG.TILE_SIZE;
-            this.x = Math.max(0, Math.min(this.x, worldPixelWidth - this.width));
-            this.y = Math.max(0, Math.min(this.y, worldPixelHeight - this.height));
+        // Ensure player stays in bounds (redundant with physics, but just in case)
+        Physics.clampToWorldBounds(this, worldEngine);
+        
+        // Update sprite animation
+        if (this.spriteAnimator) {
+            this.spriteAnimator.update(deltaTime, this.isMoving, this.facing);
         }
     }
 
@@ -182,7 +162,7 @@ export default class Player {
 
             // Define attack area based on facing direction
             let attackX, attackY, attackWidth, attackHeight;
-            const attackReach = this.attackRange; // Use defined range
+            const attackReach = this.attackRange;
 
             switch (this.facing) {
                 case 'up':
@@ -211,20 +191,23 @@ export default class Player {
                     break;
             }
             
-            // Check for hits against enemies (worldEngine will need an enemies list and method)
+            // Create attack hitbox
+            const attackHitbox = {
+                x: attackX,
+                y: attackY,
+                width: attackWidth,
+                height: attackHeight
+            };
+            
+            // Check for hits against enemies
             worldEngine.enemies.forEach(enemy => {
-                if (!enemy.dying && // Don't hit dying enemies
-                    enemy.x < attackX + attackWidth &&
-                    enemy.x + enemy.width > attackX &&
-                    enemy.y < attackY + attackHeight &&
-                    enemy.y + enemy.height > attackY) {
+                if (!enemy.dying && Physics.areColliding(attackHitbox, enemy)) {
+                    const playerCenter = Physics.getCenter(this);
+                    enemy.takeDamage(this.attackDamage, playerCenter.x, playerCenter.y);
                     
-                    enemy.takeDamage(this.attackDamage, this.x, this.y); // Enemy needs a takeDamage method
-                    // worldEngine.addEvent(`${this.name} hit ${enemy.name || 'an enemy'}!`); // Optional event
-                    
-                    if (enemy.hp <= 0 && !enemy.dying) { // Check if enemy died from this hit
-                        this.gainXP(enemy.xpValue || 25); // Enemy should have an xpValue
-                        enemy.startDying(); // Enemy needs a startDying method
+                    if (enemy.hp <= 0 && !enemy.dying) {
+                        this.gainXP(enemy.xpValue || 25);
+                        enemy.startDying();
                     }
                 }
             });
@@ -238,21 +221,16 @@ export default class Player {
             this.invulnerabilityTimer = 0;
             this.damageFlash = true;
             this.damageFlashTimer = 0;
-            
-            // worldEngine.addEvent(`${this.name} took ${damage} damage!`); // Optional
 
-            // Calculate knockback direction (from kalrpgsinglev1.html)
-            const dx = (this.x + this.width / 2) - (attackerX); // Attacker X,Y should be their center
-            const dy = (this.y + this.height / 2) - (attackerY);
-            const distance = Math.sqrt(dx * dx + dy * dy);
+            // Calculate knockback using physics utility
+            const playerCenter = Physics.getCenter(this);
+            const direction = Physics.getDirection(attackerX, attackerY, playerCenter.x, playerCenter.y);
             
-            if (distance > 0) {
-                const knockbackForce = 2.5; 
-                this.knockback.active = true;
-                this.knockback.vx = (dx / distance) * knockbackForce;
-                this.knockback.vy = (dy / distance) * knockbackForce;
-                this.knockback.timer = 0;
-            }
+            const knockbackForce = 300; // pixels per second
+            this.knockback.active = true;
+            this.knockback.vx = direction.x * knockbackForce;
+            this.knockback.vy = direction.y * knockbackForce;
+            this.knockback.timer = 0;
             
             if (this.hp <= 0) {
                 this.hp = 0;
@@ -263,11 +241,10 @@ export default class Player {
 
     gainXP(amount) {
         this.xp += amount;
-        // worldEngine.addEvent(`${this.name} gained ${amount} XP!`); // Optional
         this.checkLevelUp();
     }
 
-    checkLevelUp() { // From kalrpgsinglev1.html
+    checkLevelUp() {
         if (this.xp >= this.xpToNext) {
             this.level++;
             this.xp -= this.xpToNext;
@@ -278,23 +255,48 @@ export default class Player {
             this.attackDamage += 5;
             
             console.log(`Player leveled up! Now level ${this.level}`);
-            // worldEngine.addEvent(`${this.name} reached Level ${this.level}!`); // Optional
         }
     }
 
     die(worldEngine) {
         console.log("Player has died!");
-        // worldEngine.addEvent(`${this.name} has been defeated!`); // Optional
-        // TODO: Implement respawn logic or game over state
-        // For now, just reset HP and position to a safe spot
+        worldEngine.addEvent("You have been defeated!");
+        
+        // Reset HP
         this.hp = this.maxHp;
-        // const respawnPos = worldEngine.findSafeSpawnPosition(); // worldEngine will need this
-        // this.x = respawnPos.x;
-        // this.y = respawnPos.y;
-        this.x = CONFIG.TILE_SIZE * 5; // Temporary respawn
-        this.y = CONFIG.TILE_SIZE * 5;
-        this.invulnerable = false; // Reset invulnerability
+        
+        // Find a safe respawn position in town
+        const respawnPos = worldEngine.findSafeSpawnPosition(this.width, this.height, 'town');
+        
+        if (respawnPos) {
+            // Move to town if not already there
+            if (worldEngine.currentScreen !== 'town') {
+                worldEngine.currentScreen = 'town';
+                worldEngine.addEvent("You wake up back in town...");
+            }
+            
+            this.x = respawnPos.x;
+            this.y = respawnPos.y;
+        } else {
+            // Fallback to town center area
+            this.x = CONFIG.TILE_SIZE * 12;
+            this.y = CONFIG.TILE_SIZE * 12;
+            worldEngine.currentScreen = 'town';
+        }
+        
+        // Reset states
+        this.invulnerable = false;
+        this.invulnerabilityTimer = 0;
         this.knockback.active = false;
+        this.damageFlash = false;
+        this.isAttacking = false;
+        
+        // Lose some XP as penalty
+        const xpLoss = Math.floor(this.xp * 0.1); // Lose 10% of current XP
+        this.xp = Math.max(0, this.xp - xpLoss);
+        if (xpLoss > 0) {
+            worldEngine.addEvent(`Lost ${xpLoss} XP...`);
+        }
     }
 
     // Helper to get player's center, useful for some calculations

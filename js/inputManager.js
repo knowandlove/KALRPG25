@@ -4,7 +4,7 @@ import CONFIG from './config.js';
 export default class InputManager {
     constructor(canvas) {
         this.canvas = canvas; // Needed for mouse coordinate calculations relative to canvas
-        this.isTyping = false; // Add this line
+        this.isTyping = false; // Flag to disable game controls when typing
         this.keys = {}; // Stores the state of currently pressed keys
         this.mouse = {
             x: 0,
@@ -31,26 +31,38 @@ export default class InputManager {
 
     _setupEventListeners() {
         document.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            
-            // If we're typing, let the keypress through to the input field
+            // Always skip if we're typing in a dialogue
             if (this.isTyping) {
-                // Don't update game keys while typing
-                return;
+                return; // Don't process any game keys while typing
             }
             
+            // Also check if the active element is an input field
+            const activeElement = document.activeElement;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+                return; // Don't process game keys when any input is focused
+            }
+            
+            const key = e.key.toLowerCase();
             this.keys[key] = true;
             this._updateActiveActions();
             
-            // Prevent default browser action for keys we use ONLY if not typing
-            for (const action in this.actionMap) {
-                if (this.actionMap[action].includes(key) && this.gameMode === 'adventure') {
-                    e.preventDefault();
+            // Only prevent default for game keys in adventure mode and not typing
+            if (!this.isTyping) {
+                for (const action in this.actionMap) {
+                    if (this.actionMap[action].includes(key) && this.gameMode === 'adventure') {
+                        e.preventDefault();
+                    }
                 }
             }
         });
 
         document.addEventListener('keyup', (e) => {
+            // Check for input fields here too
+            const activeElement = document.activeElement;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+                return;
+            }
+            
             const key = e.key.toLowerCase();
             this.keys[key] = false;
             this._updateActiveActions();
@@ -97,6 +109,16 @@ export default class InputManager {
         }
     }
 
+    // Add a method to explicitly set typing state
+    setTyping(isTyping) {
+        this.isTyping = isTyping;
+        if (isTyping) {
+            // Clear all keys when entering typing mode
+            this.keys = {};
+            this._updateActiveActions();
+        }
+    }
+
     // Call this at the beginning of each game loop update
     prepareNextFrame() {
         this.mouse.clicked = false; // Reset one-frame click state
@@ -104,7 +126,11 @@ export default class InputManager {
 
     // --- Action Query Methods ---
     isActionPressed(actionName) {
-        return !!this.activeActions[actionName] && (this.gameMode === 'adventure' || actionName.startsWith('ui_')); // Only allow game actions in adventure mode
+        // Don't allow any game actions while typing
+        if (this.isTyping) {
+            return false;
+        }
+        return !!this.activeActions[actionName] && (this.gameMode === 'adventure' || actionName.startsWith('ui_'));
     }
 
     // --- Mouse Query Methods ---

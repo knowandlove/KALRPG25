@@ -11,8 +11,12 @@ const CONFIG = {
     DAY_LENGTH: 24000, // Milliseconds for a full in-game day (24 seconds)
     TICK_RATE: 60, // Target ticks per second for game logic
     
-    // Player Defaults (can be expanded)
-    PLAYER_SPEED: 3, // Movement speed for the player
+    // Movement speeds (pixels per second)
+    PLAYER_SPEED: 150, // Player movement speed
+    ENEMY_SPEED: 100, // Default enemy movement speed
+    NPC_SPEED: 80, // Default NPC movement speed
+    
+    // Player Defaults
     PLAYER_HP: 100,
     
     // Other constants

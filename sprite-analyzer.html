@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sprite Sheet Analyzer</title>
+    <style>
+        body {
+            background: #222;
+            color: white;
+            font-family: monospace;
+            padding: 20px;
+        }
+        #canvas {
+            border: 2px solid #666;
+            cursor: crosshair;
+            image-rendering: pixelated;
+            display: block;
+            margin: 20px 0;
+        }
+        .info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #333;
+            border-radius: 5px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        .controls input, .controls button {
+            margin: 0 10px;
+            padding: 5px 10px;
+        }
+        #grid {
+            position: absolute;
+            pointer-events: none;
+        }
+        .highlight {
+            background: #4a4;
+            color: #000;
+            padding: 2px 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Sprite Sheet Analyzer</h1>
+    
+    <div class="controls">
+        <label>Grid Size: 
+            <input type="number" id="gridSize" value="32" min="8" max="64">
+        </label>
+        <label>Scale: 
+            <input type="number" id="scale" value="2" min="1" max="4" step="0.5">
+        </label>
+        <button onclick="updateDisplay()">Update</button>
+    </div>
+    
+    <div class="info">
+        <div>Click on the sprite sheet to get coordinates</div>
+        <div>Mouse Position: <span id="mousePos">-</span></div>
+        <div>Grid Cell: <span id="gridCell">-</span></div>
+        <div>Sprite Coords: <span id="spriteCoords" class="highlight">-</span></div>
+    </div>
+    
+    <div style="position: relative; display: inline-block;">
+        <canvas id="canvas"></canvas>
+        <canvas id="grid" style="position: absolute; top: 0; left: 0;"></canvas>
+    </div>
+    
+    <div class="info">
+        <h3>Common Sprite Layouts:</h3>
+        <ul>
+            <li>Row 0 (y=0): Down-facing animations</li>
+            <li>Row 1 (y=32): Left-facing animations</li>
+            <li>Row 2 (y=64): Right-facing animations</li>
+            <li>Row 3 (y=96): Up-facing animations</li>
+        </ul>
+        <p>Each row typically has 4 frames: idle, walk1, walk2, walk3</p>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const gridCanvas = document.getElementById('grid');
+        const gridCtx = gridCanvas.getContext('2d');
+        
+        let img = new Image();
+        let gridSize = 32;
+        let scale = 2;
+        
+        img.onload = function() {
+            updateDisplay();
+        };
+        
+        img.onerror = function() {
+            alert('Failed to load sprite sheet. Make sure assets/sprites/characters.png exists!');
+        };
+        
+        img.src = 'assets/sprites/characters.png';
+        
+        function updateDisplay() {
+            gridSize = parseInt(document.getElementById('gridSize').value);
+            scale = parseFloat(document.getElementById('scale').value);
+            
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            gridCanvas.width = canvas.width;
+            gridCanvas.height = canvas.height;
+            
+            // Draw sprite sheet
+            ctx.imageSmoothingEnabled = false;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, img.width * scale, img.height * scale);
+            
+            // Draw grid
+            gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+            gridCtx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+            gridCtx.lineWidth = 1;
+            
+            for (let x = 0; x <= canvas.width; x += gridSize * scale) {
+                gridCtx.beginPath();
+                gridCtx.moveTo(x, 0);
+                gridCtx.lineTo(x, canvas.height);
+                gridCtx.stroke();
+            }
+            
+            for (let y = 0; y <= canvas.height; y += gridSize * scale) {
+                gridCtx.beginPath();
+                gridCtx.moveTo(0, y);
+                gridCtx.lineTo(canvas.width, y);
+                gridCtx.stroke();
+            }
+        }
+        
+        canvas.addEventListener('mousemove', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const realX = Math.floor(x / scale);
+            const realY = Math.floor(y / scale);
+            
+            const gridX = Math.floor(realX / gridSize);
+            const gridY = Math.floor(realY / gridSize);
+            
+            const spriteX = gridX * gridSize;
+            const spriteY = gridY * gridSize;
+            
+            document.getElementById('mousePos').textContent = `${realX}, ${realY}`;
+            document.getElementById('gridCell').textContent = `${gridX}, ${gridY}`;
+            document.getElementById('spriteCoords').textContent = `x: ${spriteX}, y: ${spriteY}`;
+        });
+        
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const realX = Math.floor(x / scale);
+            const realY = Math.floor(y / scale);
+            
+            const gridX = Math.floor(realX / gridSize);
+            const gridY = Math.floor(realY / gridSize);
+            
+            const spriteX = gridX * gridSize;
+            const spriteY = gridY * gridSize;
+            
+            // Copy to clipboard
+            const coords = `{ x: ${spriteX}, y: ${spriteY} }`;
+            navigator.clipboard.writeText(coords).then(() => {
+                alert(`Copied to clipboard: ${coords}`);
+            });
+        });
+        
+        // Initial display
+        setTimeout(updateDisplay, 100);
+    </script>
+</body>
+</html>

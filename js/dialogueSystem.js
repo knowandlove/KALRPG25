@@ -1,13 +1,241 @@
-// dialogueSystem.js - Handle conversations between player and NPCs
+// dialogueSystem.js - Simple tree-based dialogue system
 import CONFIG from './config.js';
 
 export class DialogueSystem {
-    constructor(worldEngine, ollamaIntegration) {
+    constructor(worldEngine) {
         this.worldEngine = worldEngine;
-        this.ollama = ollamaIntegration;
         this.activeConversation = null;
         this.conversationHistory = [];
         this.dialogueUI = null;
+        
+        // Dialogue trees for each NPC
+        this.dialogueTrees = {
+            'Elara': {
+                start: {
+                    text: "Oh, hello there! I'm Elara, the town scholar. I spend my days studying ancient texts and mysteries. Is there something you'd like to know?",
+                    choices: [
+                        { text: "Tell me about the town", next: "about_town" },
+                        { text: "What are you studying?", next: "studying" },
+                        { text: "Do you need any help?", next: "quest_check" },
+                        { text: "Goodbye", next: "end" }
+                    ]
+                },
+                about_town: {
+                    text: "Our town has quite a rich history! It was founded over 200 years ago by adventurers who discovered the nearby iron deposits. The forest to the north is ancient and full of mysteries.",
+                    choices: [
+                        { text: "Tell me about the forest", next: "about_forest" },
+                        { text: "Who else lives here?", next: "about_npcs" },
+                        { text: "Back", next: "start" }
+                    ]
+                },
+                about_forest: {
+                    text: "The northern forest is as old as time itself. Strange creatures roam there, and I've heard tales of ancient ruins deep within. Please be careful if you venture there!",
+                    choices: [
+                        { text: "What kind of creatures?", next: "forest_creatures" },
+                        { text: "Thanks for the warning", next: "start" }
+                    ]
+                },
+                forest_creatures: {
+                    text: "Goblins, wolves, and worse... Some say there are enchanted beasts that guard the old ruins. I'd love to study them someday, from a safe distance of course!",
+                    choices: [
+                        { text: "Interesting...", next: "start" }
+                    ]
+                },
+                about_npcs: {
+                    text: "Well, there's Grimm the blacksmith - gruff but kind-hearted. And Maya the merchant who travels far and wide. They're both good people.",
+                    choices: [
+                        { text: "Thanks", next: "start" }
+                    ]
+                },
+                studying: {
+                    text: "I'm researching the ancient civilization that once lived in these lands. Their ruins dot the landscape, but most are too dangerous to explore alone.",
+                    choices: [
+                        { text: "Sounds fascinating", next: "start" },
+                        { text: "Maybe I could help explore?", next: "quest_check" }
+                    ]
+                },
+                quest_check: {
+                    text: "Actually, yes! I've been trying to translate this ancient tablet, but I'm missing a piece. If you find any stone fragments in your travels, please bring them to me!",
+                    choices: [
+                        { text: "I'll keep an eye out", next: "quest_accepted" },
+                        { text: "Maybe later", next: "start" }
+                    ]
+                },
+                quest_accepted: {
+                    text: "Wonderful! The fragments are usually found near old ruins. Good luck!",
+                    onEnter: (dialogue) => {
+                        // Add quest to player's quest log when ready
+                        dialogue.worldEngine.addEvent("Quest started: Elara's Ancient Tablet");
+                    },
+                    choices: [
+                        { text: "I'll do my best", next: "end" }
+                    ]
+                },
+                end: {
+                    text: "Safe travels, friend!",
+                    choices: []
+                }
+            },
+            
+            'Grimm': {
+                start: {
+                    text: "*Grimm looks up from his anvil* What do you need? I'm busy, but I've always got time for a customer.",
+                    choices: [
+                        { text: "Show me your wares", next: "shop" },
+                        { text: "Can you repair something?", next: "repair" },
+                        { text: "Just looking around", next: "chat" },
+                        { text: "Goodbye", next: "end" }
+                    ]
+                },
+                shop: {
+                    text: "I've got the finest weapons and armor in town. All hand-forged! Though... I'm running low on materials.",
+                    choices: [
+                        { text: "What materials do you need?", next: "quest_check" },
+                        { text: "Show me weapons", next: "weapons" },
+                        { text: "Show me armor", next: "armor" },
+                        { text: "Back", next: "start" }
+                    ]
+                },
+                weapons: {
+                    text: "I've got iron swords, battle axes, and even a few enchanted daggers. Prices are fair, quality is guaranteed!",
+                    choices: [
+                        { text: "Maybe later", next: "start" }
+                    ]
+                },
+                armor: {
+                    text: "Chain mail, leather armor, sturdy shields... Everything an adventurer needs to stay alive!",
+                    choices: [
+                        { text: "I'll think about it", next: "start" }
+                    ]
+                },
+                repair: {
+                    text: "Aye, I can fix most anything. Weapons, armor, even some magical items if they're not too complex.",
+                    choices: [
+                        { text: "Good to know", next: "start" }
+                    ]
+                },
+                chat: {
+                    text: "Been smithing here for twenty years. This town's been good to me. That forest though... lost too many good people to those creatures.",
+                    choices: [
+                        { text: "What happened?", next: "forest_story" },
+                        { text: "Stay safe", next: "start" }
+                    ]
+                },
+                forest_story: {
+                    text: "Groups of goblins, mostly. But something's got them riled up lately. They're more aggressive than usual. Someone should do something about it.",
+                    choices: [
+                        { text: "Maybe I will", next: "start" },
+                        { text: "That's concerning", next: "start" }
+                    ]
+                },
+                quest_check: {
+                    text: "Iron ore's getting scarce. The best veins are in the forest, but it's too dangerous. Bring me 5 pieces of iron ore and I'll forge something special for you!",
+                    choices: [
+                        { text: "I'll get you that ore", next: "quest_accepted" },
+                        { text: "Too dangerous for me", next: "start" }
+                    ]
+                },
+                quest_accepted: {
+                    text: "Ha! You've got guts. The ore glints red in the rocks. You'll know it when you see it.",
+                    onEnter: (dialogue) => {
+                        dialogue.worldEngine.addEvent("Quest started: Grimm's Iron Ore");
+                    },
+                    choices: [
+                        { text: "I won't let you down", next: "end" }
+                    ]
+                },
+                end: {
+                    text: "*Grimm nods and returns to his work*",
+                    choices: []
+                }
+            },
+            
+            'Maya': {
+                start: {
+                    text: "Welcome, welcome! I'm Maya, merchant extraordinaire! I travel all across the land bringing exotic goods and stories. What can I interest you in today?",
+                    choices: [
+                        { text: "What are you selling?", next: "shop" },
+                        { text: "Tell me a story", next: "stories" },
+                        { text: "Heard any rumors?", next: "rumors" },
+                        { text: "Goodbye", next: "end" }
+                    ]
+                },
+                shop: {
+                    text: "I have potions from the eastern kingdoms, maps to hidden treasures, and various trinkets that might interest an adventurer like yourself!",
+                    choices: [
+                        { text: "Show me potions", next: "potions" },
+                        { text: "Tell me about the maps", next: "maps" },
+                        { text: "Back", next: "start" }
+                    ]
+                },
+                potions: {
+                    text: "Health potions, stamina draughts, even a few invisibility elixirs! Though they're not cheap - quality has its price!",
+                    choices: [
+                        { text: "I'll consider it", next: "start" }
+                    ]
+                },
+                maps: {
+                    text: "Ah, a treasure hunter! I have maps to three locations: an old watchtower, a hidden grove, and... *whispers* a dragon's lair. Interested?",
+                    choices: [
+                        { text: "Very interested!", next: "quest_check" },
+                        { text: "Maybe another time", next: "start" }
+                    ]
+                },
+                stories: {
+                    text: "Oh, where do I begin? Last month I was in the capital when the king announced a tournament! Or would you prefer to hear about the haunted mansion I discovered?",
+                    choices: [
+                        { text: "The tournament sounds exciting", next: "tournament_story" },
+                        { text: "Tell me about the mansion", next: "mansion_story" },
+                        { text: "Another time", next: "start" }
+                    ]
+                },
+                tournament_story: {
+                    text: "Champions from across the realm gathered! The winner would receive a legendary sword. A mysterious knight in black armor won every match without speaking a word!",
+                    choices: [
+                        { text: "Fascinating!", next: "start" }
+                    ]
+                },
+                mansion_story: {
+                    text: "Two days north of here, an abandoned manor where lights flicker at night. The locals say it's cursed, but I think there's treasure inside. Too scary for me though!",
+                    choices: [
+                        { text: "Might be worth investigating", next: "start" }
+                    ]
+                },
+                rumors: {
+                    text: "Well... *leans in conspiratorially* I heard the goblins in the forest have a new leader. And someone saw strange lights near the old ruins last week.",
+                    choices: [
+                        { text: "Interesting...", next: "start" },
+                        { text: "Any other news?", next: "more_rumors" }
+                    ]
+                },
+                more_rumors: {
+                    text: "The king's offering a bounty on goblin ears. And there's talk of a master thief operating in the capital. Oh! And Grimm's been working on something special in secret.",
+                    choices: [
+                        { text: "Thanks for the info", next: "start" }
+                    ]
+                },
+                quest_check: {
+                    text: "You know what? I like you. If you can clear out that old watchtower of goblins, I'll give you one of my maps for free! What do you say?",
+                    choices: [
+                        { text: "You've got a deal!", next: "quest_accepted" },
+                        { text: "I'll think about it", next: "start" }
+                    ]
+                },
+                quest_accepted: {
+                    text: "Excellent! The watchtower is northwest in the forest. Be careful - I heard there are at least five goblins there!",
+                    onEnter: (dialogue) => {
+                        dialogue.worldEngine.addEvent("Quest started: Maya's Watchtower");
+                    },
+                    choices: [
+                        { text: "I'll clear it out", next: "end" }
+                    ]
+                },
+                end: {
+                    text: "Come back soon! I'll have new items next time!",
+                    choices: []
+                }
+            }
+        };
         
         this.createDialogueUI();
     }
@@ -63,7 +291,7 @@ export class DialogueSystem {
         const npcInfo = document.createElement('div');
         npcInfo.innerHTML = `
             <div id="npcName" style="color: #88f; font-weight: bold; font-size: 18px;">NPC Name</div>
-            <div id="npcMood" style="color: #aaa; font-size: 12px; margin-top: 5px;">Mood: Neutral</div>
+            <div id="npcMood" style="color: #aaa; font-size: 12px; margin-top: 5px;"></div>
         `;
 
         npcHeader.appendChild(npcPortrait);
@@ -73,88 +301,61 @@ export class DialogueSystem {
         const dialogueText = document.createElement('div');
         dialogueText.id = 'dialogueText';
         dialogueText.style.cssText = `
-            min-height: 100px;
+            min-height: 80px;
             max-height: 200px;
             overflow-y: auto;
-            margin-bottom: 15px;
-            line-height: 1.8;
+            margin-bottom: 20px;
+            line-height: 1.6;
             font-size: 14px;
-            padding: 10px;
+            padding: 15px;
             background: rgba(0, 0, 0, 0.3);
             border-radius: 5px;
-            word-wrap: break-word;
             white-space: pre-wrap;
         `;
 
-        // Player input area (replacing choices)
-        const inputContainer = document.createElement('div');
-        inputContainer.id = 'dialogueInputContainer';
-        inputContainer.style.cssText = `
+        // Choices container
+        const choicesContainer = document.createElement('div');
+        choicesContainer.id = 'dialogueChoices';
+        choicesContainer.style.cssText = `
             display: flex;
-            gap: 10px;
-            margin-top: 15px;
+            flex-direction: column;
+            gap: 8px;
         `;
 
-        const inputField = document.createElement('input');
-        inputField.id = 'dialogueInput';
-        inputField.type = 'text';
-        inputField.placeholder = 'Type your message...';
-        inputField.style.cssText = `
-            flex: 1;
-            background: #2a2a3a;
-            color: #fff;
-            border: 1px solid #555;
-            padding: 10px;
-            border-radius: 5px;
-            font-family: inherit;
-            font-size: 13px;
+        // Instructions
+        const instructions = document.createElement('div');
+        instructions.id = 'dialogueInstructions';
+        instructions.style.cssText = `
+            margin-top: 10px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
         `;
-
-        const sendButton = document.createElement('button');
-        sendButton.id = 'dialogueSend';
-        sendButton.textContent = 'Send';
-        sendButton.style.cssText = `
-            background: #4a4af8;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 13px;
-        `;
-
-        inputContainer.appendChild(inputField);
-        inputContainer.appendChild(sendButton);
-
-        // Quick responses for common actions
-        const quickResponses = document.createElement('div');
-        quickResponses.id = 'quickResponses';
-        quickResponses.style.cssText = `
-            display: flex;
-            gap: 5px;
-            margin-bottom: 10px;
-            flex-wrap: wrap;
-        `;
+        instructions.textContent = 'Press number keys or click to select • ESC to exit';
 
         dialogueOverlay.appendChild(npcHeader);
         dialogueOverlay.appendChild(dialogueText);
-        dialogueOverlay.appendChild(quickResponses);
-        dialogueOverlay.appendChild(inputContainer);
+        dialogueOverlay.appendChild(choicesContainer);
+        dialogueOverlay.appendChild(instructions);
 
         document.body.appendChild(dialogueOverlay);
         this.dialogueUI = dialogueOverlay;
     }
 
-    async startConversation(player, npc) {
+    startConversation(player, npc) {
         if (this.activeConversation) return;
 
         this.activeConversation = {
             player: player,
             npc: npc,
-            turnCount: 0,
-            relationship: npc.getRelationship(player.name || 'Player')
+            currentNode: 'start',
+            turnCount: 0
         };
+
+        // Pause the NPC's movement
+        if (npc.isInConversation !== undefined) {
+            npc.isInConversation = true;
+        }
 
         // Show dialogue UI
         this.dialogueUI.style.display = 'block';
@@ -163,87 +364,69 @@ export class DialogueSystem {
         document.getElementById('npcPortrait').textContent = npc.appearance.symbol || '?';
         document.getElementById('npcPortrait').style.color = npc.appearance.color || '#ccc';
         document.getElementById('npcName').textContent = npc.name;
-        document.getElementById('npcMood').textContent = `Mood: ${npc.currentMood || 'Neutral'}`;
+        document.getElementById('npcMood').textContent = `${this.getNPCMood(npc)}`;
 
-        try {
-            // Generate opening dialogue
-            const context = this.buildContext();
-            let opening;
-            
-            // Check if NPC has the enhanced dialogue method
-            if (npc.generateDialogue) {
-                opening = await npc.generateDialogue(player, {
-                    ...context,
-                    playerAction: 'approaches you'
-                });
-            } else {
-                // Fallback for non-enhanced NPCs
-                opening = {
-                    text: `Hello there! I'm ${npc.name}.`,
-                    emotion: 'neutral',
-                    action: 'greeting'
-                };
-            }
-
-            this.displayDialogue(opening.text || "...");
-            this.setupInputControls();
-            this.showQuickResponses();
-        } catch (error) {
-            console.error('Error starting conversation:', error);
-            this.displayDialogue(`${npc.name} seems distracted...`);
-            this.presentPlayerChoices();
+        // Display first dialogue
+        this.displayDialogueNode('start');
+        
+        // Set up keyboard controls
+        this.setupKeyboardControls();
+        
+        // Disable game controls
+        if (window.game && window.game.inputManager) {
+            window.game.inputManager.isTyping = true;
         }
     }
 
-    buildContext() {
-        return {
-            currentLocation: this.worldEngine.currentScreen,
-            timeOfDay: this.worldEngine.worldState.timeOfDay,
-            nearbyEntities: this.getNearbyEntities(),
-            recentEvents: this.worldEngine.events.slice(0, 3).map(e => e.text)
-        };
-    }
-
-    getNearbyEntities() {
-        const entities = [];
-        const checkRadius = CONFIG.TILE_SIZE * 5;
+    getNPCMood(npc) {
+        // Simple mood based on time of day and NPC personality
+        const timeOfDay = this.worldEngine.worldState.timeOfDay;
         
-        // Check other NPCs
-        for (const [name, npc] of this.worldEngine.friendlyNPCs) {
-            if (npc !== this.activeConversation.npc) {
-                const distance = Math.sqrt(
-                    Math.pow(npc.position.x - this.activeConversation.npc.position.x, 2) +
-                    Math.pow(npc.position.y - this.activeConversation.npc.position.y, 2)
-                );
-                if (distance < checkRadius) {
-                    entities.push(name);
-                }
-            }
+        if (npc.name === 'Grimm') {
+            return timeOfDay === 'morning' ? 'Focused on work' : 'Tired but determined';
+        } else if (npc.name === 'Elara') {
+            return timeOfDay === 'night' ? 'Studying by candlelight' : 'Curious and thoughtful';
+        } else if (npc.name === 'Maya') {
+            return 'Cheerful and eager to trade';
         }
         
-        return entities;
+        return 'Neutral';
     }
 
-    displayDialogue(text) {
-        const dialogueText = document.getElementById('dialogueText');
+    displayDialogueNode(nodeId) {
+        const npcName = this.activeConversation.npc.name;
+        const tree = this.dialogueTrees[npcName];
         
-        if (!dialogueText) {
-            console.error('Dialogue text element not found!');
+        if (!tree || !tree[nodeId]) {
+            console.error(`Dialogue node ${nodeId} not found for ${npcName}`);
+            this.endConversation();
             return;
         }
-        
-        // Clear any existing text
+
+        const node = tree[nodeId];
+        this.activeConversation.currentNode = nodeId;
+
+        // Call onEnter function if it exists
+        if (node.onEnter) {
+            node.onEnter(this);
+        }
+
+        // Display text with typewriter effect
+        this.displayText(node.text);
+
+        // Display choices
+        this.displayChoices(node.choices);
+
+        // Update turn count
+        this.activeConversation.turnCount++;
+    }
+
+    displayText(text) {
+        const dialogueText = document.getElementById('dialogueText');
         dialogueText.textContent = '';
         
-        // If no text provided, show a default
-        if (!text) {
-            dialogueText.textContent = "...";
-            return;
-        }
-        
-        // Animate text appearance
+        // Typewriter effect
         let charIndex = 0;
-        
         const typeText = () => {
             if (charIndex < text.length) {
                 dialogueText.textContent += text[charIndex];
@@ -255,243 +438,158 @@ export class DialogueSystem {
         typeText();
     }
 
-    setupInputControls() {
-        const inputField = document.getElementById('dialogueInput');
-        const sendButton = document.getElementById('dialogueSend');
+    displayChoices(choices) {
+        const choicesContainer = document.getElementById('dialogueChoices');
+        choicesContainer.innerHTML = '';
+
+        choices.forEach((choice, index) => {
+            const button = document.createElement('button');
+            button.className = 'dialogue-choice';
+            button.style.cssText = `
+                background: #3a3a5a;
+                color: #fff;
+                border: 1px solid #555;
+                padding: 10px 15px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-family: inherit;
+                font-size: 13px;
+                text-align: left;
+                transition: all 0.2s;
+            `;
+            
+            button.innerHTML = `<span style="color: #88f;">${index + 1}.</span> ${choice.text}`;
+            
+            button.onmouseover = () => {
+                button.style.background = '#4a4a6a';
+                button.style.borderColor = '#88f';
+            };
+            
+            button.onmouseout = () => {
+                button.style.background = '#3a3a5a';
+                button.style.borderColor = '#555';
+            };
+            
+            button.onclick = () => this.selectChoice(index);
+            
+            choicesContainer.appendChild(button);
+        });
+    }
+
+    selectChoice(index) {
+        const npcName = this.activeConversation.npc.name;
+        const tree = this.dialogueTrees[npcName];
+        const currentNode = tree[this.activeConversation.currentNode];
         
-        if (!inputField || !sendButton) return;
+        if (!currentNode.choices[index]) return;
         
-        // Clear and focus input
-        inputField.value = '';
-        inputField.focus();
+        const choice = currentNode.choices[index];
         
-        // Remove any existing event listeners
-        if (this.sendHandler) {
-            sendButton.removeEventListener('click', this.sendHandler);
+        // Log the choice
+        this.conversationHistory.push({
+            speaker: 'Player',
+            text: choice.text,
+            timestamp: Date.now()
+        });
+
+        // Handle special actions
+        if (choice.action) {
+            this.handleAction(choice.action);
         }
-        if (this.keypressHandler) {
-            inputField.removeEventListener('keypress', this.keypressHandler);
+
+        // Move to next node
+        if (choice.next === 'end') {
+            this.endConversation();
+        } else if (choice.next) {
+            this.displayDialogueNode(choice.next);
         }
-        if (this.focusHandler) {
-            inputField.removeEventListener('focus', this.focusHandler);
+    }
+
+    handleAction(action) {
+        // Handle special actions like giving items, starting quests, etc.
+        switch (action.type) {
+            case 'give_item':
+                // Add item to player inventory when implemented
+                this.worldEngine.addEvent(`Received ${action.item}!`);
+                break;
+            case 'start_quest':
+                // Add quest to player's quest log when implemented
+                this.worldEngine.addEvent(`Quest started: ${action.quest}`);
+                break;
+            // Add more action types as needed
         }
-        if (this.blurHandler) {
-            inputField.removeEventListener('blur', this.blurHandler);
-        }
-        
-        // Tell the input manager we're in dialogue when focused
-        this.focusHandler = () => {
-            console.log('Input field focused');
-            if (window.game && window.game.inputManager) {
-                window.game.inputManager.setTyping ? 
-                    window.game.inputManager.setTyping(true) : 
-                    (window.game.inputManager.isTyping = true);
+    }
+
+    setupKeyboardControls() {
+        this.keyHandler = (e) => {
+            // Number keys for choices
+            const num = parseInt(e.key);
+            if (!isNaN(num) && num >= 1 && num <= 9) {
+                this.selectChoice(num - 1);
             }
-        };
-        
-        this.blurHandler = () => {
-            console.log('Input field blurred');
-            if (window.game && window.game.inputManager) {
-                window.game.inputManager.setTyping ? 
-                    window.game.inputManager.setTyping(false) : 
-                    (window.game.inputManager.isTyping = false);
-            }
-        };
-        
-        inputField.addEventListener('focus', this.focusHandler);
-        inputField.addEventListener('blur', this.blurHandler);
-        
-        // Create new handlers
-        this.sendHandler = () => {
-            const message = inputField.value.trim();
-            if (message) {
-                this.handlePlayerMessage(message);
-                inputField.value = '';
-            }
-        };
-        
-        this.keypressHandler = (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault(); // Prevent form submission
-                const message = inputField.value.trim();
-                if (message) {
-                    this.handlePlayerMessage(message);
-                    inputField.value = '';
-                }
-            }
-        };
-        
-        // Add event listeners
-        sendButton.addEventListener('click', this.sendHandler);
-        inputField.addEventListener('keypress', this.keypressHandler);
-        
-        // Separate ESC handler that checks if we're in the input field
-        if (this.escapeHandler) {
-            document.removeEventListener('keydown', this.escapeHandler);
-        }
-        
-        this.escapeHandler = (e) => {
-            // Only handle ESC if we're not typing in the input field
-            if (e.key === 'Escape' && document.activeElement !== inputField) {
+            // ESC to exit
+            else if (e.key === 'Escape') {
                 this.endConversation();
             }
         };
         
-        document.addEventListener('keydown', this.escapeHandler);
-    }
-
-    showQuickResponses() {
-        const quickContainer = document.getElementById('quickResponses');
-        if (!quickContainer) return;
-        
-        quickContainer.innerHTML = '';
-        
-        const quickOptions = [
-            "Hello!",
-            "How are you?",
-            "Tell me about yourself",
-            "What's new?",
-            "Goodbye"
-        ];
-        
-        quickOptions.forEach(text => {
-            const btn = document.createElement('button');
-            btn.textContent = text;
-            btn.style.cssText = `
-                background: #3a3a5a;
-                color: #fff;
-                border: 1px solid #555;
-                padding: 5px 10px;
-                border-radius: 3px;
-                cursor: pointer;
-                font-size: 12px;
-                font-family: inherit;
-            `;
-            btn.onclick = () => {
-                document.getElementById('dialogueInput').value = text;
-                this.handlePlayerMessage(text);
-            };
-            quickContainer.appendChild(btn);
-        });
-    }
-
-    async handlePlayerMessage(message) {
-        if (!this.activeConversation) return;
-        
-        // Add to conversation history
-        this.conversationHistory.push({
-            speaker: 'Player',
-            text: message,
-            timestamp: Date.now()
-        });
-        
-        // Check for goodbye
-        if (message.toLowerCase().includes('bye') || message.toLowerCase().includes('goodbye')) {
-            this.endConversation();
-            return;
-        }
-        
-        // Disable input while processing
-        const inputField = document.getElementById('dialogueInput');
-        const sendButton = document.getElementById('dialogueSend');
-        if (inputField) inputField.disabled = true;
-        if (sendButton) sendButton.disabled = true;
-        
-        try {
-            // Generate NPC response
-            const context = this.buildContext();
-            context.playerAction = message;
-            
-            let response;
-            
-            if (this.activeConversation.npc.generateDialogue) {
-                response = await this.activeConversation.npc.generateDialogue(
-                    this.activeConversation.player,
-                    context
-                );
-            } else {
-                response = {
-                    text: `${this.activeConversation.npc.name} listens thoughtfully.`,
-                    emotion: 'neutral'
-                };
-            }
-            
-            // Add to history
-            this.conversationHistory.push({
-                speaker: this.activeConversation.npc.name,
-                text: response.text,
-                timestamp: Date.now()
-            });
-            
-            // Update UI
-            document.getElementById('npcMood').textContent = `Mood: ${response.emotion || 'neutral'}`;
-            this.displayDialogue(response.text || "...");
-            
-            // Re-enable input after response
-            setTimeout(() => {
-                if (inputField) inputField.disabled = false;
-                if (sendButton) sendButton.disabled = false;
-                if (inputField) inputField.focus();
-            }, 500);
-            
-            // Update turn count
-            this.activeConversation.turnCount++;
-            
-        } catch (error) {
-            console.error('Error in dialogue:', error);
-            this.displayDialogue("...");
-            if (inputField) inputField.disabled = false;
-            if (sendButton) sendButton.disabled = false;
-        }
+        document.addEventListener('keydown', this.keyHandler);
     }
 
     endConversation() {
         if (!this.activeConversation) return;
 
-        // Make sure typing flag is cleared
-        if (window.game && window.game.inputManager) {
-            window.game.inputManager.isTyping = false;
+        // Resume NPC movement
+        if (this.activeConversation.npc && this.activeConversation.npc.isInConversation !== undefined) {
+            this.activeConversation.npc.isInConversation = false;
         }
 
         // Create memory of conversation for NPC
         const npc = this.activeConversation.npc;
-        const conversationSummary = `Had a ${this.activeConversation.turnCount}-turn conversation with ${this.activeConversation.player.name || 'an adventurer'}`;
-        npc.rememberEvent(conversationSummary);
+        npc.rememberEvent(`Had a conversation with ${this.activeConversation.player.name || 'an adventurer'}`);
 
         // Log conversation to world events
-        this.worldEngine.addEvent(`${npc.name} finished talking with ${this.activeConversation.player.name || 'the player'}`);
+        this.worldEngine.addEvent(`Finished talking with ${npc.name}`);
 
         // Hide UI
         this.dialogueUI.style.display = 'none';
         
-        // Cleanup event listeners
-        const inputField = document.getElementById('dialogueInput');
-        const sendButton = document.getElementById('dialogueSend');
-        
-        if (this.sendHandler && sendButton) {
-            sendButton.removeEventListener('click', this.sendHandler);
-        }
-        if (this.keypressHandler && inputField) {
-            inputField.removeEventListener('keypress', this.keypressHandler);
-        }
-        if (this.focusHandler && inputField) {
-            inputField.removeEventListener('focus', this.focusHandler);
-        }
-        if (this.blurHandler && inputField) {
-            inputField.removeEventListener('blur', this.blurHandler);
-        }
-        if (this.escapeHandler) {
-            document.removeEventListener('keydown', this.escapeHandler);
-        }
-        if (this.currentKeyHandler) {
-            document.removeEventListener('keydown', this.currentKeyHandler);
+        // Clean up event listener
+        if (this.keyHandler) {
+            document.removeEventListener('keydown', this.keyHandler);
         }
         
+        // Clear active conversation
         this.activeConversation = null;
+        
+        // Re-enable game controls
+        if (window.game && window.game.inputManager) {
+            window.game.inputManager.isTyping = false;
+            window.game.inputManager.keys = {};
+            window.game.inputManager._updateActiveActions();
+        }
+        
+        // Return focus to the game canvas
+        if (window.game && window.game.worldEngine && window.game.worldEngine.canvas) {
+            window.game.worldEngine.canvas.focus();
+        }
     }
 
     isInConversation() {
         return this.activeConversation !== null;
+    }
+
+    // Method to add or modify dialogue trees dynamically
+    addDialogueTree(npcName, tree) {
+        this.dialogueTrees[npcName] = tree;
+    }
+
+    // Method to add a node to existing tree
+    addDialogueNode(npcName, nodeId, node) {
+        if (!this.dialogueTrees[npcName]) {
+            this.dialogueTrees[npcName] = {};
+        }
+        this.dialogueTrees[npcName][nodeId] = node;
     }
 }
 
